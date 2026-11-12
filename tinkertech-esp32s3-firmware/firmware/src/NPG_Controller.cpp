@@ -96,7 +96,7 @@ void NPGChannelTracker::step(float v, float t, bool calibrated) {
 
 bool NPGChannelTracker::isClenched(float t) {
     if (!mu_valid) return false;
-    return active || ((t - last_active_t) < NPG_CLENCH_HOLD_S);
+    return active || ((NPG_CLENCH_HOLD_S > 0.0f) && ((t - last_active_t) < NPG_CLENCH_HOLD_S));
 }
 
 // ============================================================================

@@ -26,7 +26,7 @@ ARM_LIMITS = {
     "left": LEFT_LIMIT,
     "right": RIGHT_LIMIT,
 }
-OFF_RATIO = 0.7
+OFF_RATIO = 1.0
 
 SETTLE_SECONDS = 1.0
 CALIB_SECONDS = 3.0
@@ -37,8 +37,8 @@ ENV_TAU_S = 0.05
 BASELINE_TAU_S = 30.0
 
 CLENCH_MIN_ON_S = 0.04
-CLENCH_OFF_HANG_S = 0.10
-CLENCH_HOLD_S = 0.15
+CLENCH_OFF_HANG_S = 0.0
+CLENCH_HOLD_S = 0.0
 
 HIST_LEN = 1000
 
@@ -97,7 +97,7 @@ class ArmChannelTracker:
 
         if self.active:
             self.off_count = self.off_count + 1 if delta < self.off_th else 0
-            if self.off_count >= self.off_need:
+            if self.off_count >= max(1, self.off_need):
                 self.active = False
                 self.on_count = 0
         else:
@@ -114,7 +114,7 @@ class ArmChannelTracker:
     def is_clenched(self, t: float) -> bool:
         if self.mu is None:
             return False
-        return self.active or (t - self.last_active_t < CLENCH_HOLD_S)
+        return self.active or (CLENCH_HOLD_S > 0.0 and (t - self.last_active_t < CLENCH_HOLD_S))
 
 
 class StateDetector:
