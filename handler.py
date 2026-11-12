@@ -20,24 +20,24 @@ RIGHT_CH = 1
 ARM_CHANNELS = (LEFT_CH, RIGHT_CH)
 ARM_NAMES = ("left", "right")
 
-LEFT_LIMIT = 0.04
-RIGHT_LIMIT = 0.04
+LEFT_LIMIT = 0.035
+RIGHT_LIMIT = 0.035
 ARM_LIMITS = {
     "left": LEFT_LIMIT,
     "right": RIGHT_LIMIT,
 }
-OFF_RATIO = 1.0
+OFF_RATIO = 0.85
 
 SETTLE_SECONDS = 1.0
 CALIB_SECONDS = 3.0
 
 EMG_LOW = 20.0
 EMG_HIGH = 200.0
-ENV_TAU_S = 0.025
-BASELINE_TAU_S = 30.0
+ENV_TAU_S = 0.030
+BASELINE_TAU_S = 15.0
 
-CLENCH_MIN_ON_S = 0.02
-CLENCH_OFF_HANG_S = 0.0
+CLENCH_MIN_ON_S = 0.025
+CLENCH_OFF_HANG_S = 0.006
 CLENCH_HOLD_S = 0.0
 
 HIST_LEN = 1000
@@ -89,11 +89,14 @@ class ArmChannelTracker:
         if self.mu is None:
             arr = np.array(self.calib_env, dtype=float)
             self.mu = float(np.median(arr)) if len(arr) else 0.0
+            self.noise_sigma = float(np.std(arr)) if len(arr) else 0.0
 
-        # Baseline-subtracted normalized envelope compared against the limit
+        # Adaptive threshold: nominal limit protected by 3.5 * sigma noise floor
+        eff_limit = max(self.limit, 3.5 * getattr(self, 'noise_sigma', 0.0))
         delta = max(0.0, v - self.mu)
-        self.on_th = self.limit
-        self.off_th = self.limit * OFF_RATIO
+        self.current_delta = delta
+        self.on_th = eff_limit
+        self.off_th = eff_limit * OFF_RATIO
 
         if self.active:
             self.off_count = self.off_count + 1 if delta < self.off_th else 0
@@ -228,9 +231,17 @@ class StateDetector:
 
         left_on = self.trackers["left"].is_clenched(self.t)
         right_on = self.trackers["right"].is_clenched(self.t)
+        dl = getattr(self.trackers["left"], "current_delta", 0.0)
+        dr = getattr(self.trackers["right"], "current_delta", 0.0)
 
         if left_on and right_on:
-            self._state = "both"
+            # Crosstalk & Dominance filter: prevent accidental forward lunges during turns
+            if dl > 1.8 * dr:
+                self._state = "left"
+            elif dr > 1.8 * dl:
+                self._state = "right"
+            else:
+                self._state = "both"
         elif left_on:
             self._state = "left"
         elif right_on:

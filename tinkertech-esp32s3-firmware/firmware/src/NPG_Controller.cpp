@@ -30,6 +30,7 @@ void NPGChannelTracker::init(float chLimit) {
 
     calib_count = 0;
     mu = 0.0f;
+    noise_sigma = 0.0f;
     mu_valid = false;
 
     on_th = chLimit;
@@ -62,16 +63,27 @@ void NPGChannelTracker::step(float v, float t, bool calibrated) {
         if (calib_count > 0) {
             std::nth_element(calib_buf, calib_buf + calib_count / 2, calib_buf + calib_count);
             mu = calib_buf[calib_count / 2];
+
+            // Calculate standard deviation / noise spread
+            float var_sum = 0.0f;
+            for (int i = 0; i < calib_count; ++i) {
+                float diff = calib_buf[i] - mu;
+                var_sum += diff * diff;
+            }
+            noise_sigma = sqrtf(var_sum / calib_count);
         } else {
             mu = 0.0f;
+            noise_sigma = 0.0f;
         }
         mu_valid = true;
     }
 
+    // Adaptive threshold: nominal limit protected by 3.5 * sigma noise floor
+    float eff_limit = fmaxf(limit, 3.5f * noise_sigma);
     float delta = fmaxf(0.0f, v - mu);
     current_delta = delta;
-    on_th = limit;
-    off_th = limit * NPG_OFF_RATIO;
+    on_th = eff_limit;
+    off_th = eff_limit * NPG_OFF_RATIO;
 
     if (active) {
         off_count = (delta < off_th) ? (off_count + 1) : 0;
@@ -341,9 +353,18 @@ void NPG_Controller::processSample(int16_t ch0, int16_t ch1) {
 
     bool left_clench = m_leftTracker.isClenched(m_t);
     bool right_clench = m_rightTracker.isClenched(m_t);
+    float dl = m_leftTracker.current_delta;
+    float dr = m_rightTracker.current_delta;
 
     if (left_clench && right_clench) {
-        m_state = NPG_DECISION_BOTH;
+        // Crosstalk & Dominance filter: prevent accidental forward lunges during turns
+        if (dl > 1.8f * dr) {
+            m_state = NPG_DECISION_LEFT;
+        } else if (dr > 1.8f * dl) {
+            m_state = NPG_DECISION_RIGHT;
+        } else {
+            m_state = NPG_DECISION_BOTH;
+        }
     } else if (left_clench) {
         m_state = NPG_DECISION_LEFT;
     } else if (right_clench) {
