@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "TinkerKit.h"
+#include "NPG_Controller.h"
 
 // WiFi Credentials provided by user
 const char* WIFI_SSID = "0xMakers_Dev";
@@ -300,20 +301,33 @@ void drawDashboard() {
     gfx.setTextColor(TFT_GREENYELLOW, gfx.color565(20, 25, 45));
     gfx.drawString(battStr, 220, 6);
 
-    // Network & Connection Card (y: 28..74)
+    // Connection Card (y: 28..74)
     gfx.drawRoundRect(4, 28, 312, 46, 4, TFT_DARKCYAN);
     gfx.fillRect(5, 29, 310, 44, gfx.color565(12, 18, 28));
     gfx.setTextColor(TFT_WHITE, gfx.color565(12, 18, 28));
 
-    String ipStr = "Connecting to " + String(WIFI_SSID) + "...";
-    if (WiFi.status() == WL_CONNECTED) {
-        ipStr = "STA: " + WiFi.localIP().toString() + " : " + String(UDP_PORT);
+    if (NPGController.isConnected()) {
+        if (!NPGController.isCalibrated()) {
+            int pct = (int)(NPGController.getCalibProgress() * 100.0f);
+            gfx.drawString("NPG LITE BLE: CALIBRATING...", 10, 33);
+            gfx.setTextColor(TFT_YELLOW, gfx.color565(12, 18, 28));
+            char pStr[48];
+            snprintf(pStr, sizeof(pStr), "Progress: %d%% (Relax Both Arms)", pct);
+            gfx.drawString(pStr, 10, 48);
+        } else {
+            gfx.drawString("NPG LITE BLE: LINKED & ACTIVE", 10, 33);
+            gfx.setTextColor(TFT_GREENYELLOW, gfx.color565(12, 18, 28));
+            char pStr[64];
+            snprintf(pStr, sizeof(pStr), "L:%.2f (th %.2f) | R:%.2f (th %.2f)",
+                     NPGController.getLeftEnv(), NPGController.getLeftLimit(),
+                     NPGController.getRightEnv(), NPGController.getRightLimit());
+            gfx.drawString(pStr, 10, 48);
+        }
     } else {
-        ipStr = "AP: " + WiFi.softAPIP().toString() + " (TinkerBot:8888)";
+        gfx.drawString("NPG LITE BLE: SCANNING...", 10, 33);
+        gfx.setTextColor(TFT_ORANGE, gfx.color565(12, 18, 28));
+        gfx.drawString("Waiting for NPG device to advertise...", 10, 48);
     }
-    gfx.drawString("WIFI UDP TARGET:", 10, 33);
-    gfx.setTextColor(TFT_GREEN, gfx.color565(12, 18, 28));
-    gfx.drawString(ipStr.c_str(), 10, 48);
 
     // Police Strobe Flashing Badge
     if (policeLights) {
@@ -414,8 +428,12 @@ void setup() {
     // Start UDP Server
     udp.begin(UDP_PORT);
 
+    // Initialize Direct NPG Lite BLE Connection
+    NPGController.begin();
+
     Serial.println("\n==========================================");
     Serial.println("TinkerTech NPG Police Bot Ready");
+    Serial.println("NPG Lite BLE Direct Interface: ACTIVE");
     Serial.printf("Connecting to SSID: %s\n", WIFI_SSID);
     Serial.printf("UDP Listening Port: %d\n", UDP_PORT);
     Serial.println("Police Strobe Lights: ACTIVE");
@@ -431,6 +449,31 @@ void loop() {
 
     // High-speed non-blocking police strobe
     updatePoliceLights();
+
+    // Direct NPG Lite BLE processing
+    NPGController.update();
+
+    static NPGDecisionState lastNpgState = NPG_DECISION_NONE;
+    static uint32_t lastNpgHeartbeat = 0;
+    if (NPGController.isConnected() && NPGController.isCalibrated()) {
+        NPGDecisionState currState = NPGController.getCurrentState();
+        bool stateChanged = (currState != lastNpgState);
+        bool heartbeat = (millis() - lastNpgHeartbeat >= 250);
+
+        if (stateChanged || (currState != NPG_DECISION_NONE && heartbeat)) {
+            lastNpgHeartbeat = millis();
+            lastNpgState = currState;
+            if (currState == NPG_DECISION_BOTH) {
+                executeMotion(DIR_FORWARD, 100, "[NPG BLE]");
+            } else if (currState == NPG_DECISION_LEFT) {
+                executeMotion(DIR_LEFT, 25, "[NPG BLE]");
+            } else if (currState == NPG_DECISION_RIGHT) {
+                executeMotion(DIR_RIGHT, 25, "[NPG BLE]");
+            } else {
+                executeMotion(DIR_STOP, 0, "[NPG BLE]");
+            }
+        }
+    }
 
     // Process incoming UDP packets (Teleop & NPG Lite)
     handleUdp();
