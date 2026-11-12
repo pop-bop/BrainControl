@@ -318,7 +318,7 @@ void NPG_Controller::processSample(int16_t ch0, int16_t ch1) {
 
     // Envelope filter (exponential power smoothing + sqrt)
     // alpha = 1 - exp(-1 / (500 * 0.05)) = 0.03921056f
-    const float al = 0.03921056f;
+    static const float al = 1.0f - expf(-1.0f / (NPG_FS * NPG_ENV_TAU_S));
     m_envPower[0] = (1.0f - al) * m_envPower[0] + al * (emg_l * emg_l);
     m_envPower[1] = (1.0f - al) * m_envPower[1] + al * (emg_r * emg_r);
 

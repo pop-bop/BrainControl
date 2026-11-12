@@ -20,18 +20,18 @@
 #define NPG_RIGHT_CH            1
 
 // Preconfigured thresholds and constants directly from handler.py
-#define NPG_LEFT_LIMIT          0.045f
-#define NPG_RIGHT_LIMIT         0.045f
+#define NPG_LEFT_LIMIT          0.04f
+#define NPG_RIGHT_LIMIT         0.04f
 #define NPG_OFF_RATIO           1.0f
 
 #define NPG_SETTLE_SECONDS      1.0f
 #define NPG_CALIB_SECONDS       3.0f
 
-#define NPG_CLENCH_MIN_ON_S     0.04f   // 20 samples @ 500Hz
+#define NPG_CLENCH_MIN_ON_S     0.02f   // 20 samples @ 500Hz
 #define NPG_CLENCH_OFF_HANG_S   0.00f   // 50 samples @ 500Hz
 #define NPG_CLENCH_HOLD_S       0.00f   // 150 ms
 #define NPG_BASELINE_TAU_S      30.0f
-#define NPG_ENV_TAU_S           0.05f
+#define NPG_ENV_TAU_S           0.025f
 
 #define NPG_CALIB_MAX_SAMPLES   1200
 
