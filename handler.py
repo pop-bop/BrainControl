@@ -151,6 +151,7 @@ class StateDetector:
         self._scale = None
         self._calib_logged = False
         self._state = "none"
+        self._in_forward_mode = False
 
     def pull_state(self) -> str:
         with self.lock:
@@ -234,20 +235,30 @@ class StateDetector:
         dl = getattr(self.trackers["left"], "current_delta", 0.0)
         dr = getattr(self.trackers["right"], "current_delta", 0.0)
 
-        if left_on and right_on:
-            # Crosstalk & Dominance filter: prevent accidental forward lunges during turns
-            if dl > 1.8 * dr:
-                self._state = "left"
-            elif dr > 1.8 * dl:
-                self._state = "right"
+        if self._in_forward_mode:
+            # While moving straight, only allow turning after detecting no signal.
+            # Otherwise, as long as any signal is present, continue moving forward!
+            if not left_on and not right_on:
+                self._in_forward_mode = False
+                self._state = "none"
             else:
                 self._state = "both"
-        elif left_on:
-            self._state = "left"
-        elif right_on:
-            self._state = "right"
         else:
-            self._state = "none"
+            if left_on and right_on:
+                # Crosstalk & Dominance filter: prevent accidental forward lunges during turns
+                if dl > 1.8 * dr:
+                    self._state = "left"
+                elif dr > 1.8 * dl:
+                    self._state = "right"
+                else:
+                    self._state = "both"
+                    self._in_forward_mode = True
+            elif left_on:
+                self._state = "left"
+            elif right_on:
+                self._state = "right"
+            else:
+                self._state = "none"
 
 
 _default_detector = StateDetector()

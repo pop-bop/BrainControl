@@ -126,6 +126,7 @@ private:
     NPGChannelTracker m_leftTracker;
     NPGChannelTracker m_rightTracker;
     NPGDecisionState  m_state;
+    bool              m_inForwardMode;
 
     uint32_t m_lastScanTime;
     uint32_t m_lastPacketTime;

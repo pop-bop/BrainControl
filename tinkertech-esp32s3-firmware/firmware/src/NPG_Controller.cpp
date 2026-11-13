@@ -170,6 +170,7 @@ NPG_Controller::NPG_Controller()
       m_scaleDetected(false),
       m_sampleCount(0),
       m_state(NPG_DECISION_NONE),
+      m_inForwardMode(false),
       m_lastScanTime(0),
       m_lastPacketTime(0)
 {
@@ -192,6 +193,7 @@ void NPG_Controller::begin() {
     pBLEScan->setActiveScan(true);
 
     m_doScan = true;
+    m_inForwardMode = false;
     m_lastScanTime = millis();
 }
 
@@ -356,21 +358,33 @@ void NPG_Controller::processSample(int16_t ch0, int16_t ch1) {
     float dl = m_leftTracker.current_delta;
     float dr = m_rightTracker.current_delta;
 
-    if (left_clench && right_clench) {
-        // Crosstalk & Dominance filter: prevent accidental forward lunges during turns
-        if (dl > 1.8f * dr) {
-            m_state = NPG_DECISION_LEFT;
-        } else if (dr > 1.8f * dl) {
-            m_state = NPG_DECISION_RIGHT;
+    if (m_inForwardMode) {
+        // While moving straight, only allow turning after detecting no signal.
+        // Otherwise, as long as any signal is present, continue moving forward!
+        if (!left_clench && !right_clench) {
+            m_inForwardMode = false;
+            m_state = NPG_DECISION_NONE;
         } else {
             m_state = NPG_DECISION_BOTH;
         }
-    } else if (left_clench) {
-        m_state = NPG_DECISION_LEFT;
-    } else if (right_clench) {
-        m_state = NPG_DECISION_RIGHT;
     } else {
-        m_state = NPG_DECISION_NONE;
+        if (left_clench && right_clench) {
+            // Crosstalk & Dominance filter: prevent accidental forward lunges during turns
+            if (dl > 1.8f * dr) {
+                m_state = NPG_DECISION_LEFT;
+            } else if (dr > 1.8f * dl) {
+                m_state = NPG_DECISION_RIGHT;
+            } else {
+                m_state = NPG_DECISION_BOTH;
+                m_inForwardMode = true; // Lock into forward mode
+            }
+        } else if (left_clench) {
+            m_state = NPG_DECISION_LEFT;
+        } else if (right_clench) {
+            m_state = NPG_DECISION_RIGHT;
+        } else {
+            m_state = NPG_DECISION_NONE;
+        }
     }
 }
 
