@@ -20,7 +20,7 @@
 #define NPG_RIGHT_CH            1
 
 // Preconfigured thresholds and constants directly from handler.py
-#define NPG_LEFT_LIMIT          0.025f
+#define NPG_LEFT_LIMIT          0.015f
 #define NPG_RIGHT_LIMIT         0.025f
 #define NPG_OFF_RATIO           0.85f
 
