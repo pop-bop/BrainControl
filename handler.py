@@ -21,7 +21,7 @@ ARM_CHANNELS = (LEFT_CH, RIGHT_CH)
 ARM_NAMES = ("left", "right")
 
 LEFT_LIMIT = 0.015
-RIGHT_LIMIT = 0.025
+RIGHT_LIMIT = 0.015
 ARM_LIMITS = {
     "left": LEFT_LIMIT,
     "right": RIGHT_LIMIT,
